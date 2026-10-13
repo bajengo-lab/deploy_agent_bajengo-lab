@@ -85,16 +85,53 @@ case "$roster_choice" in
             exit 1
         fi
         echo "Template roster copied successfully."
+         total_sessions=5
         ;;
     B|b)
         echo "You selected a fresh roster."
-        # Fresh roster generation will be added here.
+        read -r -p "How many students do you want to add? " student_count
+
+        if [[ ! "$student_count" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Error: Enter a positive whole number."
+            exit 1
+        fi
+
+        roster_file="$project_dir/Helpers/assets.csv"
+
+        echo "Email,Names,Attendance Count,Absence Count" > "$roster_file"
+
+        for ((i = 1; i <= student_count; i++)); do
+            read -r -p "Enter student $i's name: " student_name
+            read -r -p "Enter student $i's email: " student_email
+
+            if [[ -z "$student_name" || -z "$student_email" ]]; then
+                echo "Error: Name and email cannot be empty."
+                exit 1
+            fi
+
+            echo "$student_email,$student_name,0,0" >> "$roster_file"
+        done
+
+        echo "Fresh student roster created successfully."
+        total_sessions=1
         ;;
     *)
         echo "Error: Invalid choice. Enter A or B."
         exit 1
         ;;
 esac
+
+# Update total_sessions in config.json
+config_file="$project_dir/Helpers/config.json"
+
+if ! sed -i -E \
+    's/("total_sessions"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$total_sessions"'/' \
+    "$config_file"; then
+    echo "Error: Could not update total_sessions."
+    exit 1
+fi
+
+echo "Total sessions set to $total_sessions."
 
 
 
