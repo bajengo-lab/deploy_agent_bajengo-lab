@@ -134,4 +134,61 @@ fi
 echo "Total sessions set to $total_sessions."
 
 
+# Set permissions for the deployed files
+app_file="$project_dir/attendance_checker.py"
 
+if ! chmod +x "$app_file"; then
+    echo "Error: Could not make attendance_checker.py executable."
+    exit 1
+fi
+
+if ! chmod 600 "$config_file"; then
+    echo "Error: Could not restrict config.json permissions."
+    exit 1
+fi
+
+echo "File permissions updated successfully."
+ls -l "$app_file" "$config_file"
+
+
+
+# Offer to update attendance alert thresholds
+read -r -p "Update attendance alert thresholds? (y/n): " update_thresholds
+
+if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
+
+    read -r -p "Enter warning threshold (default 75): " warning
+    read -r -p "Enter failure threshold (default 50): " failure
+
+    # Validate that both inputs are whole numbers
+    if [[ ! "$warning" =~ ^[0-9]+$ || ! "$failure" =~ ^[0-9]+$ ]]; then
+        echo "Error: Thresholds must be numeric."
+        exit 1
+    fi
+
+    # Validate percentage ranges
+    if (( warning < 0 || warning > 100 || failure < 0 || failure > 100 )); then
+        echo "Error: Thresholds must be between 0 and 100."
+        exit 1
+    fi
+
+    # Update the warning threshold
+    if ! sed -i -E \
+        's/("warning"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$warning"'/' \
+        "$config_file"; then
+        echo "Error: Could not update warning threshold."
+        exit 1
+    fi
+
+    # Update the failure threshold
+    if ! sed -i -E \
+        's/("failure"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$failure"'/' \
+        "$config_file"; then
+        echo "Error: Could not update failure threshold."
+        exit 1
+    fi
+
+    echo "Thresholds updated successfully."
+else
+    echo "Keeping the existing thresholds."
+fi
