@@ -1,3 +1,5 @@
 
 # Local backup of the deployment script
 deploy_agent_backup.sh
+# Generated attendance tracker test deployments
+attendance_tracker_*/
