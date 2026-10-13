@@ -65,10 +65,36 @@ if ! cp "$template_dir/attendance_checker.py" "$project_dir/"; then
     exit 1
 fi
 
-if ! cp "$template_dir/assets.csv" "$project_dir/Helpers/" ||
-   ! cp "$template_dir/config.json" "$project_dir/Helpers/"; then
-    echo "Error: Could not copy the configuration files."
+
+# Copy config.json into the Helpers directory
+if ! cp "$template_dir/config.json" "$project_dir/Helpers/"; then
+    echo "Error: Could not copy config.json."
     exit 1
 fi
 
-echo "Application and configuration files copied successfully."
+# Ask the user how to create the student roster
+echo "Choose how to create the student roster:"
+echo "A. Copy students from the template roster"
+echo "B. Generate a fresh roster"
+read -r -p "Enter A or B: " roster_choice
+
+case "$roster_choice" in
+    A|a)
+        if ! cp "$template_dir/assets.csv" "$project_dir/Helpers/"; then
+            echo "Error: Could not copy the template roster."
+            exit 1
+        fi
+        echo "Template roster copied successfully."
+        ;;
+    B|b)
+        echo "You selected a fresh roster."
+        # Fresh roster generation will be added here.
+        ;;
+    *)
+        echo "Error: Invalid choice. Enter A or B."
+        exit 1
+        ;;
+esac
+
+
+
