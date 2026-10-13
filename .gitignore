@@ -3,3 +3,5 @@
 deploy_agent_backup.sh
 # Generated attendance tracker test deployments
 attendance_tracker_*/
+# Generated log archives from testing
+archives/

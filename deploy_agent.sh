@@ -249,24 +249,6 @@ run_project() {
         return 1
     fi
 }
-while true; do
-    echo
-    echo "===== Attendance Tracker Manager ====="
-    echo "1. Deploy a new project"
-    echo "2. Run an existing project"
-    echo "3. Archive logs (coming next)"
-    echo "4. Exit"
-
-    read -r -p "Choose an option: " choice
-
-    case "$choice" in
-        1) deploy_project ;;
-        2) run_project ;;
-        3) archive_logs ;;
-        4) echo "Goodbye!"; break ;;
-        *) echo "Invalid choice. Enter 1, 2, 3, or 4." ;;
-    esac
-done
 
 archive_logs() {
     local input
@@ -340,3 +322,24 @@ archive_logs() {
         echo "Warning: absent.log was not found; skipping it."
     fi
 }
+
+while true; do
+    echo
+    echo "===== Attendance Tracker Manager ====="
+    echo "1. Deploy a new project"
+    echo "2. Run an existing project"
+    echo "3. Archive logs (coming next)"
+    echo "4. Exit"
+
+    read -r -p "Choose an option: " choice
+
+    case "$choice" in
+        1) deploy_project ;;
+        2) run_project ;;
+        3) archive_logs ;;
+        4) echo "Goodbye!"; break ;;
+        *) echo "Invalid choice. Enter 1, 2, 3, or 4." ;;
+    esac
+done
+
+
