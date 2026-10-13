@@ -13,6 +13,8 @@ fi
 
 echo "Pre-flight checks complete."
 
+# Feature 1: Deploy a new attendance tracker
+deploy_project() {
 
 # Ask for the project name
 read -r -p "Enter a project name: " input
@@ -20,7 +22,7 @@ read -r -p "Enter a project name: " input
 # Validate the project name
 if [[ ! "$input" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     echo "Error: Use only letters, numbers, underscores, and hyphens."
-    exit 1
+    return 1
 fi
 
 project_dir="attendance_tracker_${input}"
@@ -35,14 +37,14 @@ if [[ -d "$project_dir" ]]; then
         rm -rf -- "$project_dir"
     else
         echo "Deployment cancelled."
-        exit 1
+        return 1
     fi
 fi
 
 # Create the required project directories
 if ! mkdir -p "$project_dir/Helpers" "$project_dir/reports"; then
     echo "Error: Could not create project directories."
-    exit 1
+    return 1
 fi
 
 echo "Project directories created successfully."
@@ -53,7 +55,7 @@ template_dir="templates"
 for file in attendance_checker.py assets.csv config.json; do
     if [[ ! -f "$template_dir/$file" ]]; then
         echo "Error: Missing template file: $template_dir/$file"
-        exit 1
+        return 1
     fi
 done
 
@@ -62,14 +64,14 @@ echo "All required template files are available."
 # Deploy the application and its configuration
 if ! cp "$template_dir/attendance_checker.py" "$project_dir/"; then
     echo "Error: Could not copy the application."
-    exit 1
+    return 1
 fi
 
 
 # Copy config.json into the Helpers directory
 if ! cp "$template_dir/config.json" "$project_dir/Helpers/"; then
     echo "Error: Could not copy config.json."
-    exit 1
+    return 1
 fi
 
 # Ask the user how to create the student roster
@@ -82,7 +84,7 @@ case "$roster_choice" in
     A|a)
         if ! cp "$template_dir/assets.csv" "$project_dir/Helpers/"; then
             echo "Error: Could not copy the template roster."
-            exit 1
+            return 1
         fi
         echo "Template roster copied successfully."
          total_sessions=5
@@ -93,7 +95,7 @@ case "$roster_choice" in
 
         if [[ ! "$student_count" =~ ^[1-9][0-9]*$ ]]; then
             echo "Error: Enter a positive whole number."
-            exit 1
+            return 1
         fi
 
         roster_file="$project_dir/Helpers/assets.csv"
@@ -106,7 +108,7 @@ case "$roster_choice" in
 
             if [[ -z "$student_name" || -z "$student_email" ]]; then
                 echo "Error: Name and email cannot be empty."
-                exit 1
+                return 1
             fi
 
             echo "$student_email,$student_name,0,0" >> "$roster_file"
@@ -117,7 +119,7 @@ case "$roster_choice" in
         ;;
     *)
         echo "Error: Invalid choice. Enter A or B."
-        exit 1
+        return 1
         ;;
 esac
 
@@ -128,7 +130,7 @@ if ! sed -i -E \
     's/("total_sessions"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$total_sessions"'/' \
     "$config_file"; then
     echo "Error: Could not update total_sessions."
-    exit 1
+    return 1
 fi
 
 echo "Total sessions set to $total_sessions."
@@ -139,12 +141,12 @@ app_file="$project_dir/attendance_checker.py"
 
 if ! chmod +x "$app_file"; then
     echo "Error: Could not make attendance_checker.py executable."
-    exit 1
+    return 1
 fi
 
 if ! chmod 600 "$config_file"; then
     echo "Error: Could not restrict config.json permissions."
-    exit 1
+    return 1
 fi
 
 echo "File permissions updated successfully."
@@ -163,13 +165,13 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
     # Validate that both inputs are whole numbers
     if [[ ! "$warning" =~ ^[0-9]+$ || ! "$failure" =~ ^[0-9]+$ ]]; then
         echo "Error: Thresholds must be numeric."
-        exit 1
+        return 1
     fi
 
     # Validate percentage ranges
     if (( warning < 0 || warning > 100 || failure < 0 || failure > 100 )); then
         echo "Error: Thresholds must be between 0 and 100."
-        exit 1
+        return 1
     fi
 
     # Update the warning threshold
@@ -177,7 +179,7 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
         's/("warning"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$warning"'/' \
         "$config_file"; then
         echo "Error: Could not update warning threshold."
-        exit 1
+        return 1
     fi
 
     # Update the failure threshold
@@ -185,7 +187,7 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
         's/("failure"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$failure"'/' \
         "$config_file"; then
         echo "Error: Could not update failure threshold."
-        exit 1
+        return 1
     fi
 
     echo "Thresholds updated successfully."
@@ -203,7 +205,65 @@ if ! (
     python3 attendance_checker.py
 ); then
     echo "Error: The attendance application failed to run."
-    exit 1
+    return 1
 fi
 
 echo "Attendance application finished."
+
+}
+run_project() {
+    local input
+    local project_dir
+
+    echo
+    echo "===== Run Existing Project ====="
+
+    read -r -p "Enter the project name (e.g. v1): " input
+
+    if [[ ! "$input" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "Error: Invalid project name."
+        return 1
+    fi
+
+    project_dir="attendance_tracker_${input}"
+
+    if [[ ! -d "$project_dir" ]]; then
+        echo "Error: Project '$project_dir' does not exist."
+        return 1
+    fi
+
+    if [[ ! -f "$project_dir/attendance_checker.py" ]]; then
+        echo "Error: attendance_checker.py was not found."
+        return 1
+    fi
+
+    echo "Starting attendance tracker..."
+
+    if (
+        cd "$project_dir" &&
+        python3 attendance_checker.py
+    ); then
+        echo "Attendance application finished."
+    else
+        echo "Error: The attendance application failed."
+        return 1
+    fi
+}
+while true; do
+    echo
+    echo "===== Attendance Tracker Manager ====="
+    echo "1. Deploy a new project"
+    echo "2. Run an existing project"
+    echo "3. Archive logs (coming next)"
+    echo "4. Exit"
+
+    read -r -p "Choose an option: " choice
+
+    case "$choice" in
+        1) deploy_project ;;
+        2) run_project ;;
+        3) echo "Log archiving will be implemented next." ;;
+        4) echo "Goodbye!"; break ;;
+        *) echo "Invalid choice. Enter 1, 2, 3, or 4." ;;
+    esac
+done
