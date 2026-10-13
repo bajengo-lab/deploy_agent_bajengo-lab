@@ -262,8 +262,81 @@ while true; do
     case "$choice" in
         1) deploy_project ;;
         2) run_project ;;
-        3) echo "Log archiving will be implemented next." ;;
+        3) archive_logs ;;
         4) echo "Goodbye!"; break ;;
         *) echo "Invalid choice. Enter 1, 2, 3, or 4." ;;
     esac
 done
+
+archive_logs() {
+    local input
+    local project_dir
+    local timestamp
+    local archive_root
+    local attendance_log
+    local absent_log
+    local attendance_archive
+    local absent_archive
+
+    echo
+    echo "===== Archive Logs ====="
+
+    read -r -p "Enter the project name (e.g. v1): " input
+
+    if [[ ! "$input" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "Error: Invalid project name."
+        return 1
+    fi
+
+    project_dir="attendance_tracker_${input}"
+
+    if [[ ! -d "$project_dir" ]]; then
+        echo "Error: Project '$project_dir' does not exist."
+        return 1
+    fi
+
+    attendance_log="$project_dir/reports/attendance.log"
+    absent_log="$project_dir/reports/absent.log"
+
+    if [[ ! -f "$attendance_log" && ! -f "$absent_log" ]]; then
+        echo "Error: No attendance or absence logs were found."
+        return 1
+    fi
+
+    archive_root="archives"
+    timestamp=$(date +"%Y%m%d_%H%M%S") || {
+        echo "Error: Could not generate timestamp."
+        return 1
+    }
+
+    if ! mkdir -p "$archive_root/attendance" "$archive_root/absent"; then
+        echo "Error: Could not create archive directories."
+        return 1
+    fi
+
+    if [[ -f "$attendance_log" ]]; then
+        attendance_archive="$archive_root/attendance/attendance_${timestamp}.log"
+
+        if cp -- "$attendance_log" "$attendance_archive"; then
+            echo "Attendance log archived: $attendance_archive"
+        else
+            echo "Error: Could not archive attendance.log."
+            return 1
+        fi
+    else
+        echo "Warning: attendance.log was not found; skipping it."
+    fi
+
+    if [[ -f "$absent_log" ]]; then
+        absent_archive="$archive_root/absent/absent_${timestamp}.log"
+
+        if cp -- "$absent_log" "$absent_archive"; then
+            echo "Absence log archived: $absent_archive"
+        else
+            echo "Error: Could not archive absent.log."
+            return 1
+        fi
+    else
+        echo "Warning: absent.log was not found; skipping it."
+    fi
+}
