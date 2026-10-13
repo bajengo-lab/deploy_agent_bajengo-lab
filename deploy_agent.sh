@@ -38,3 +38,37 @@ if [[ -d "$project_dir" ]]; then
         exit 1
     fi
 fi
+
+# Create the required project directories
+if ! mkdir -p "$project_dir/Helpers" "$project_dir/reports"; then
+    echo "Error: Could not create project directories."
+    exit 1
+fi
+
+echo "Project directories created successfully."
+
+# Verify that all required template files exist
+template_dir="templates"
+
+for file in attendance_checker.py assets.csv config.json; do
+    if [[ ! -f "$template_dir/$file" ]]; then
+        echo "Error: Missing template file: $template_dir/$file"
+        exit 1
+    fi
+done
+
+echo "All required template files are available."
+
+# Deploy the application and its configuration
+if ! cp "$template_dir/attendance_checker.py" "$project_dir/"; then
+    echo "Error: Could not copy the application."
+    exit 1
+fi
+
+if ! cp "$template_dir/assets.csv" "$project_dir/Helpers/" ||
+   ! cp "$template_dir/config.json" "$project_dir/Helpers/"; then
+    echo "Error: Could not copy the configuration files."
+    exit 1
+fi
+
+echo "Application and configuration files copied successfully."
