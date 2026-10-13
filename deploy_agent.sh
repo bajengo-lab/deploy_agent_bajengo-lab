@@ -192,3 +192,18 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
 else
     echo "Keeping the existing thresholds."
 fi
+
+
+# Verify deployment by running the attendance application
+echo "Deployment setup complete."
+echo "Starting the attendance application..."
+
+if ! (
+    cd "$project_dir" &&
+    python3 attendance_checker.py
+); then
+    echo "Error: The attendance application failed to run."
+    exit 1
+fi
+
+echo "Attendance application finished."
