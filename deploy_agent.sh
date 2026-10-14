@@ -13,6 +13,59 @@ fi
 
 echo "Pre-flight checks complete."
 
+# Deployment interruption state
+deployment_in_progress=false
+project_dir=""
+project_archive=""
+interruption_handled=false
+
+handle_interruption() {
+    local signal_name="$1"
+
+    # Do not clean up if a deployment is not in progress
+    if [[ "$deployment_in_progress" != true ]]; then
+        echo
+        echo "Signal received ($signal_name), but no deployment is in progress."
+        return
+    fi
+
+    echo
+    echo "Deployment interrupted by $signal_name."
+
+    # Archive the incomplete project if it exists
+    if [[ -n "$project_dir" && -d "$project_dir" ]]; then
+        project_archive="${project_dir}_archive.zip"
+
+        if zip -r "$project_archive" "$project_dir"; then
+            echo "Partial deployment archived as: $project_archive"
+
+            if rm -rf -- "$project_dir"; then
+                echo "Incomplete deployment directory removed."
+            else
+                echo "Error: Could not remove the incomplete deployment directory."
+            fi
+        else
+            echo "Error: Could not archive the incomplete deployment."
+            echo "The incomplete directory has been left in place."
+        fi
+    fi
+
+    deployment_in_progress=false
+    project_dir=""
+    project_archive=""
+    interruption_handled=true
+}
+cleanup_failed_deployment() {
+    echo "Deployment failed. Cleaning up deployment state."
+    echo "Any partially created directory has been left for inspection."
+
+    deployment_in_progress=false
+    project_dir=""
+    project_archive=""
+}
+trap 'handle_interruption SIGINT; if [[ "$interruption_handled" == true ]]; then exit 130; fi' SIGINT
+trap 'handle_interruption SIGTSTP; if [[ "$interruption_handled" == true ]]; then exit 148; fi' SIGTSTP
+
 # Feature 1: Deploy a new attendance tracker
 deploy_project() {
 
@@ -26,6 +79,7 @@ if [[ ! "$input" =~ ^[a-zA-Z0-9_-]+$ ]]; then
 fi
 
 project_dir="attendance_tracker_${input}"
+
 echo "Project directory: $project_dir"
 
 # Check whether the project directory already exists
@@ -41,9 +95,13 @@ if [[ -d "$project_dir" ]]; then
     fi
 fi
 
+# Mark deployment as active
+deployment_in_progress=true
+
 # Create the required project directories
 if ! mkdir -p "$project_dir/Helpers" "$project_dir/reports"; then
     echo "Error: Could not create project directories."
+    cleanup_failed_deployment
     return 1
 fi
 
@@ -55,6 +113,7 @@ template_dir="templates"
 for file in attendance_checker.py assets.csv config.json; do
     if [[ ! -f "$template_dir/$file" ]]; then
         echo "Error: Missing template file: $template_dir/$file"
+        cleanup_failed_deployment
         return 1
     fi
 done
@@ -64,6 +123,7 @@ echo "All required template files are available."
 # Deploy the application and its configuration
 if ! cp "$template_dir/attendance_checker.py" "$project_dir/"; then
     echo "Error: Could not copy the application."
+    cleanup_failed_deployment
     return 1
 fi
 
@@ -71,6 +131,7 @@ fi
 # Copy config.json into the Helpers directory
 if ! cp "$template_dir/config.json" "$project_dir/Helpers/"; then
     echo "Error: Could not copy config.json."
+    cleanup_failed_deployment
     return 1
 fi
 
@@ -84,6 +145,7 @@ case "$roster_choice" in
     A|a)
         if ! cp "$template_dir/assets.csv" "$project_dir/Helpers/"; then
             echo "Error: Could not copy the template roster."
+            cleanup_failed_deployment
             return 1
         fi
         echo "Template roster copied successfully."
@@ -95,6 +157,7 @@ case "$roster_choice" in
 
         if [[ ! "$student_count" =~ ^[1-9][0-9]*$ ]]; then
             echo "Error: Enter a positive whole number."
+            cleanup_failed_deployment
             return 1
         fi
 
@@ -108,6 +171,7 @@ case "$roster_choice" in
 
             if [[ -z "$student_name" || -z "$student_email" ]]; then
                 echo "Error: Name and email cannot be empty."
+                cleanup_failed_deployment
                 return 1
             fi
 
@@ -119,6 +183,7 @@ case "$roster_choice" in
         ;;
     *)
         echo "Error: Invalid choice. Enter A or B."
+        cleanup_failed_deployment
         return 1
         ;;
 esac
@@ -130,6 +195,7 @@ if ! sed -i -E \
     's/("total_sessions"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$total_sessions"'/' \
     "$config_file"; then
     echo "Error: Could not update total_sessions."
+    cleanup_failed_deployment
     return 1
 fi
 
@@ -141,12 +207,14 @@ app_file="$project_dir/attendance_checker.py"
 
 if ! chmod +x "$app_file"; then
     echo "Error: Could not make attendance_checker.py executable."
+    cleanup_failed_deployment
     return 1
 fi
 
 if ! chmod 600 "$config_file"; then
     echo "Error: Could not restrict config.json permissions."
-    return 1
+    cleanup_failed_deployment    
+return 1
 fi
 
 echo "File permissions updated successfully."
@@ -162,15 +230,21 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
     read -r -p "Enter warning threshold (default 75): " warning
     read -r -p "Enter failure threshold (default 50): " failure
 
+    # Apply defaults when the user presses Enter
+    [[ -z "$warning" ]] && warning=75
+    [[ -z "$failure" ]] && failure=50  
+
     # Validate that both inputs are whole numbers
     if [[ ! "$warning" =~ ^[0-9]+$ || ! "$failure" =~ ^[0-9]+$ ]]; then
         echo "Error: Thresholds must be numeric."
+        cleanup_failed_deployment
         return 1
     fi
 
     # Validate percentage ranges
     if (( warning < 0 || warning > 100 || failure < 0 || failure > 100 )); then
         echo "Error: Thresholds must be between 0 and 100."
+        cleanup_failed_deployment        
         return 1
     fi
 
@@ -179,6 +253,7 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
         's/("warning"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$warning"'/' \
         "$config_file"; then
         echo "Error: Could not update warning threshold."
+        cleanup_failed_deployment
         return 1
     fi
 
@@ -187,6 +262,7 @@ if [[ "$update_thresholds" == "y" || "$update_thresholds" == "Y" ]]; then
         's/("failure"[[:space:]]*:[[:space:]]*)[0-9]+/\1'"$failure"'/' \
         "$config_file"; then
         echo "Error: Could not update failure threshold."
+        cleanup_failed_deployment
         return 1
     fi
 
@@ -205,10 +281,16 @@ if ! (
     python3 attendance_checker.py
 ); then
     echo "Error: The attendance application failed to run."
+    cleanup_failed_deployment
     return 1
 fi
 
 echo "Attendance application finished."
+
+# Deployment completed successfully
+deployment_in_progress=false
+project_dir=""
+project_archive=""
 
 }
 run_project() {
@@ -328,7 +410,7 @@ while true; do
     echo "===== Attendance Tracker Manager ====="
     echo "1. Deploy a new project"
     echo "2. Run an existing project"
-    echo "3. Archive logs (coming next)"
+    echo "3. Archive logs"
     echo "4. Exit"
 
     read -r -p "Choose an option: " choice
